@@ -1,7 +1,10 @@
 import json
 import os
 
-SUBSCRIBERS_FILE = os.path.join(os.path.dirname(__file__), "subscribers.json")
+SUBSCRIBERS_FILE = os.environ.get(
+    "SUBSCRIBERS_FILE",
+    os.path.join(os.path.dirname(__file__), "subscribers.json"),
+)
 
 
 def _load() -> dict[str, dict]:
