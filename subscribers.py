@@ -1,10 +1,28 @@
 import json
 import os
 
+from config import CATEGORIES
+
 SUBSCRIBERS_FILE = os.environ.get(
     "SUBSCRIBERS_FILE",
     os.path.join(os.path.dirname(__file__), "subscribers.json"),
 )
+
+ALL_CATEGORIES = list(CATEGORIES.keys())
+
+# Categories that replaced the old "current_affairs" umbrella
+_CURRENT_AFFAIRS_REPLACEMENTS = ["geopolitics", "science", "tech", "business"]
+
+
+def _migrate_categories(cats: list[str]) -> list[str]:
+    """Replace legacy 'current_affairs' with the 4 new sub-categories."""
+    if "current_affairs" not in cats:
+        return cats
+    cats = [c for c in cats if c != "current_affairs"]
+    for new in _CURRENT_AFFAIRS_REPLACEMENTS:
+        if new not in cats:
+            cats.append(new)
+    return cats
 
 
 def _load() -> dict[str, dict]:
@@ -22,7 +40,11 @@ def _save(data: dict[str, dict]) -> None:
 
 def subscribe(chat_id: int, time: str = "08:00") -> None:
     data = _load()
-    data[str(chat_id)] = {"time": time}
+    key = str(chat_id)
+    if key in data:
+        data[key]["time"] = time
+    else:
+        data[key] = {"time": time, "categories": list(ALL_CATEGORIES)}
     _save(data)
 
 
@@ -45,12 +67,55 @@ def set_time(chat_id: int, time: str) -> bool:
     return True
 
 
+def toggle_category(chat_id: int, category: str) -> bool | None:
+    """Toggle a category on/off. Returns new state, or None if not subscribed."""
+    data = _load()
+    key = str(chat_id)
+    if key not in data:
+        return None
+    cats = _migrate_categories(data[key].get("categories", list(ALL_CATEGORIES)))
+    if category in cats:
+        cats.remove(category)
+    else:
+        cats.append(category)
+    data[key]["categories"] = cats
+    _save(data)
+    return category in cats
+
+
 def get_subscriber(chat_id: int) -> dict | None:
     data = _load()
-    return data.get(str(chat_id))
+    sub = data.get(str(chat_id))
+    if sub and "categories" not in sub:
+        sub["categories"] = list(ALL_CATEGORIES)
+    if sub:
+        sub["categories"] = _migrate_categories(sub["categories"])
+    return sub
 
 
-def get_subscribers_for_time(time_str: str) -> list[int]:
-    """Return chat IDs whose delivery time matches the given HH:MM."""
+def has_set_categories(chat_id: int) -> bool:
+    """Check if a subscriber has explicitly set their categories."""
     data = _load()
-    return [int(cid) for cid, info in data.items() if info["time"] == time_str]
+    sub = data.get(str(chat_id))
+    return sub is not None and "categories" in sub
+
+
+def mark_categories_prompted(chat_id: int) -> None:
+    """Mark that we've prompted this user to set categories, by writing the default."""
+    data = _load()
+    key = str(chat_id)
+    if key in data and "categories" not in data[key]:
+        data[key]["categories"] = list(ALL_CATEGORIES)
+        _save(data)
+
+
+def get_subscribers_for_time(time_str: str) -> list[tuple[int, list[str]]]:
+    """Return (chat_id, categories) for subscribers whose delivery time matches."""
+    data = _load()
+    result = []
+    for cid, info in data.items():
+        if info["time"] == time_str:
+            cats = _migrate_categories(info.get("categories", list(ALL_CATEGORIES)))
+            if cats:
+                result.append((int(cid), cats))
+    return result

@@ -1,6 +1,16 @@
+import re
+
 import feedparser
 import httpx
 from datetime import datetime, timedelta, timezone
+
+
+def _strip_html(text: str) -> str:
+    """Remove HTML tags and decode common entities."""
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+    text = text.replace("&quot;", '"').replace("&#39;", "'").replace("&nbsp;", " ")
+    return re.sub(r"\s+", " ", text).strip()
 
 from config import RSS_FEEDS
 
@@ -29,7 +39,7 @@ def fetch_feed(url: str, max_items: int = 10) -> list[dict]:
         items.append({
             "title": entry.get("title", "No title"),
             "link": entry.get("link", ""),
-            "summary": entry.get("summary", "")[:500],
+            "summary": _strip_html(entry.get("summary", ""))[:500],
             "source": feed.feed.get("title", url),
         })
 

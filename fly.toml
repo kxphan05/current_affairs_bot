@@ -4,13 +4,21 @@
 #
 
 app = 'affairsbot'
-primary_region = 'sin'
+primary_region = 'ams'
 
 [build]
 
 [env]
   TIMEZONE = 'Asia/Singapore'
   SUBSCRIBERS_FILE = '/data/subscribers.json'
+  WEBHOOK_URL = 'https://affairsbot.fly.dev'
+  PORT = '8080'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'off'
+  auto_start_machines = true
 
 [mounts]
   source = 'affairsbot_data'

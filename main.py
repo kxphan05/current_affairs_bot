@@ -1,4 +1,5 @@
 import logging
+import os
 from datetime import datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -12,6 +13,9 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
+PORT = int(os.getenv("PORT", "8080"))
 
 
 def main() -> None:
@@ -42,8 +46,16 @@ def main() -> None:
     app.post_init = on_startup
     app.post_shutdown = on_shutdown
 
-    logger.info("Bot starting — polling for commands...")
-    app.run_polling()
+    if WEBHOOK_URL:
+        logger.info(f"Bot starting — webhook on port {PORT}")
+        app.run_webhook(
+            listen="0.0.0.0",
+            port=PORT,
+            webhook_url=WEBHOOK_URL,
+        )
+    else:
+        logger.info("Bot starting — polling for commands...")
+        app.run_polling()
 
 
 if __name__ == "__main__":
