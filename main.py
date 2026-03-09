@@ -36,7 +36,8 @@ def main() -> None:
         logger.info(f"Scheduler started (checking every minute, tz={TIMEZONE})")
 
     async def on_shutdown(_app) -> None:
-        scheduler.shutdown()
+        if scheduler.running:
+            scheduler.shutdown()
 
     app.post_init = on_startup
     app.post_shutdown = on_shutdown
