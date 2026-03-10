@@ -15,7 +15,7 @@ def _strip_html(text: str) -> str:
 from config import RSS_FEEDS
 
 
-def fetch_feed(url: str, max_items: int = 10) -> list[dict]:
+def fetch_feed(url: str, max_items: int = 10, cutoff_hours: int = 72) -> list[dict]:
     """Fetch and parse a single RSS feed."""
     try:
         response = httpx.get(url, timeout=15, follow_redirects=True)
@@ -24,7 +24,7 @@ def fetch_feed(url: str, max_items: int = 10) -> list[dict]:
         return []
 
     items = []
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=72)
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=cutoff_hours)
 
     for entry in feed.entries[:max_items]:
         published = None
@@ -46,14 +46,35 @@ def fetch_feed(url: str, max_items: int = 10) -> list[dict]:
     return items
 
 
+def _dedup_items(items: list[dict]) -> list[dict]:
+    """Remove duplicate items by URL."""
+    seen: set[str] = set()
+    unique: list[dict] = []
+    for item in items:
+        url = item.get("link", "").rstrip("/")
+        if url and url in seen:
+            continue
+        seen.add(url)
+        unique.append(item)
+    return unique
+
+
+CATEGORY_CUTOFF_HOURS: dict[str, int] = {
+    "sg_policy": 168,  # 7 days
+    "ai_conflicts": 168,  # 7 days
+}
+DEFAULT_CUTOFF_HOURS = 72  # 3 days
+
+
 def fetch_all_news() -> dict[str, list[dict]]:
     """Fetch news from all RSS feeds, grouped by category."""
     all_news: dict[str, list[dict]] = {}
 
     for category, feeds in RSS_FEEDS.items():
+        cutoff = CATEGORY_CUTOFF_HOURS.get(category, DEFAULT_CUTOFF_HOURS)
         items: list[dict] = []
         for feed_url in feeds:
-            items.extend(fetch_feed(feed_url))
-        all_news[category] = items
+            items.extend(fetch_feed(feed_url, cutoff_hours=cutoff))
+        all_news[category] = _dedup_items(items)
 
     return all_news

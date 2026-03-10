@@ -7,16 +7,23 @@ from config import CATEGORIES, PUBLICAI_API_KEY, PUBLICAI_BASE_URL, PUBLICAI_MOD
 
 
 SYSTEM_PROMPT = """\
-You are a TLDR news editor. Group ALL the raw items by common theme, then summarise each item under its theme.
+You are a TLDR news editor. Group the raw items by common theme, then summarise each item under its theme.
 
-Rules:
-- Identify 2-4 natural themes from the stories (e.g. "Middle East tensions", "Trade & tariffs", "AI regulation").
-- Theme headers: use a short bold label, max 4 words.
-- Under each theme, list every relevant story as a bullet.
+FILTERING — skip these entirely, do NOT include them:
+- Advertisements, deals, discounts, giveaways, or promotions
+- Product reviews or buyer's guides
+- Duplicate stories (if multiple articles cover the same event, pick the best one)
+- Clickbait or trivial stories with no real news value
+
+STRUCTURE:
+- Maximum 3 themes. Pick the 3 most newsworthy.
+- Maximum 3 bullets per theme. Pick the most important.
+- Theme headers: short bold label, max 4 words.
+
+FORMAT:
 - Headline: max 6 words. DO NOT copy the article title. Write your own punchy short headline.
 - Summary: one sentence, max 12 words. Add context the headline doesn't already give.
 - Every bullet MUST end with a markdown link from the raw item's Link field. Never fabricate URLs.
-- If a story doesn't fit any theme, group it under "Other".
 - No fluff, no filler, no editorialising. Just the core fact.
 
 Output ONLY the grouped bullets, no preamble. Follow this format EXACTLY:
@@ -78,6 +85,37 @@ def _sanitize_telegram_markdown(text: str) -> str:
     return text
 
 
+MAX_THEMES = 3
+MAX_BULLETS_PER_THEME = 3
+
+
+def _trim_themes(text: str) -> str:
+    """Enforce max themes and max bullets per theme on the LLM output."""
+    lines = text.split("\n")
+    result = []
+    theme_count = 0
+    bullet_count = 0
+
+    for line in lines:
+        stripped = line.strip()
+        # Detect theme header: a bold line that isn't a bullet
+        if stripped.startswith("**") and not stripped.startswith("• ") and stripped.endswith("**"):
+            if theme_count >= MAX_THEMES:
+                break
+            theme_count += 1
+            bullet_count = 0
+            result.append(line)
+        elif stripped.startswith("•"):
+            if bullet_count < MAX_BULLETS_PER_THEME:
+                result.append(line)
+                bullet_count += 1
+        else:
+            # Blank lines / other content — keep for formatting
+            result.append(line)
+
+    return "\n".join(result).strip()
+
+
 def summarise_category(category_key: str, items: list[dict]) -> str:
     """Use PublicAI to summarise raw news items into a clean digest section."""
     if not items:
@@ -99,7 +137,8 @@ def summarise_category(category_key: str, items: list[dict]) -> str:
                 {"role": "user", "content": prompt},
             ],
         )
-        return _sanitize_telegram_markdown(response.choices[0].message.content.strip())
+        content = response.choices[0].message.content.strip()
+        return _sanitize_telegram_markdown(_trim_themes(content))
     except Exception as e:
         if "contentfilter" in str(e).lower() or "content_policy" in str(e).lower():
             return "_Summary unavailable — content was filtered by the API provider._"
