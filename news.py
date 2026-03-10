@@ -59,6 +59,63 @@ def _dedup_items(items: list[dict]) -> list[dict]:
     return unique
 
 
+PARLIAMENT_BILLS_URL = (
+    "https://www.parliament.gov.sg/parliamentary-business/bills-introduced"
+    "?year={year}&pageNo=1"
+)
+
+
+def fetch_parliament_bills(cutoff_hours: int = 168) -> list[dict]:
+    """Scrape recent bills from Singapore Parliament website."""
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=cutoff_hours)
+    year = now.year
+    url = PARLIAMENT_BILLS_URL.format(year=year)
+
+    try:
+        response = httpx.get(url, timeout=15, follow_redirects=True)
+        html = response.text
+    except Exception:
+        return []
+
+    items = []
+    # Each bill row contains a title link + introduction date
+    # Pattern: <a href="/docs/default-source/bills-introduced/...pdf">Title</a>
+    # and date like "06.03.2026"
+    bill_blocks = re.findall(
+        r'<a[^>]+href="([^"]*bills-introduced[^"]*\.pdf)"[^>]*>\s*(.*?)\s*</a>',
+        html,
+        re.DOTALL,
+    )
+    dates = re.findall(r'(\d{2}\.\d{2}\.\d{4})', html)
+
+    for i, (pdf_path, raw_title) in enumerate(bill_blocks):
+        title = _strip_html(raw_title).strip()
+        if not title:
+            continue
+
+        # Parse the introduction date (first date associated with this bill)
+        introduced = None
+        if i < len(dates):
+            try:
+                introduced = datetime.strptime(dates[i], "%d.%m.%Y").replace(tzinfo=timezone.utc)
+            except ValueError:
+                pass
+
+        if introduced and introduced < cutoff:
+            continue
+
+        link = pdf_path if pdf_path.startswith("http") else f"https://www.parliament.gov.sg{pdf_path}"
+        items.append({
+            "title": f"[Bill] {title}",
+            "link": link,
+            "summary": f"Bill introduced in Singapore Parliament on {dates[i] if i < len(dates) else 'unknown date'}.",
+            "source": "Parliament of Singapore",
+        })
+
+    return items
+
+
 CATEGORY_CUTOFF_HOURS: dict[str, int] = {
     "sg_policy": 168,  # 7 days
     "ai_conflicts": 168,  # 7 days
@@ -75,6 +132,8 @@ def fetch_all_news() -> dict[str, list[dict]]:
         items: list[dict] = []
         for feed_url in feeds:
             items.extend(fetch_feed(feed_url, cutoff_hours=cutoff))
+        if category == "sg_policy":
+            items.extend(fetch_parliament_bills(cutoff_hours=cutoff))
         all_news[category] = _dedup_items(items)
 
     return all_news

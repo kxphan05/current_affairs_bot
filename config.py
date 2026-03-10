@@ -49,7 +49,6 @@ RSS_FEEDS = {
         "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6511",
         "https://www.straitstimes.com/news/singapore/rss.xml",
         "https://www.gov.sg/rss/news",
-        "https://sprs.parl.gov.sg/search/rss/parliament",
     ],
     "ai_conflicts": [
         "https://feeds.bbci.co.uk/news/technology/rss.xml",
