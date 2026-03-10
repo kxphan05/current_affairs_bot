@@ -38,10 +38,12 @@ Output ONLY the grouped bullets, no preamble. Follow this format EXACTLY:
 
 CATEGORY_INSTRUCTIONS = {
     "sg_policy": (
-        "IMPORTANT: Only pick stories about Singapore government policy, legislation, "
-        "parliamentary debates, ministerial statements, regulatory changes, or public "
-        "consultations. Ignore general Singapore news like crime, entertainment, sports, "
-        "or human interest stories. "
+        "Focus on stories about Singapore governance, public policy, legislation, "
+        "parliamentary debates, ministerial statements, regulatory changes, public "
+        "consultations, housing (HDB), transport, healthcare, education, defence, "
+        "economy, or infrastructure. Include stories about government agencies (MAS, "
+        "MOH, MOE, MND, etc.) and major national developments. "
+        "Skip celebrity gossip, entertainment, and sports unless they involve policy. "
         "If no stories match, say '_No relevant stories today._'"
     ),
     "ai_conflicts": (

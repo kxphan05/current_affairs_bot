@@ -61,27 +61,13 @@ def _dedup_items(items: list[dict]) -> list[dict]:
 
 PARLIAMENT_BILLS_URL = (
     "https://www.parliament.gov.sg/parliamentary-business/bills-introduced"
-    "?year={year}&pageNo=1"
+    "?year={year}&pageNo={page}"
 )
 
 
-def fetch_parliament_bills(cutoff_hours: int = 168) -> list[dict]:
-    """Scrape recent bills from Singapore Parliament website."""
-    now = datetime.now(timezone.utc)
-    cutoff = now - timedelta(hours=cutoff_hours)
-    year = now.year
-    url = PARLIAMENT_BILLS_URL.format(year=year)
-
-    try:
-        response = httpx.get(url, timeout=15, follow_redirects=True)
-        html = response.text
-    except Exception:
-        return []
-
+def _parse_bills_page(html: str, cutoff: datetime) -> tuple[list[dict], bool]:
+    """Parse a single bills page. Returns (items, has_more_within_cutoff)."""
     items = []
-    # Each bill row contains a title link + introduction date
-    # Pattern: <a href="/docs/default-source/bills-introduced/...pdf">Title</a>
-    # and date like "06.03.2026"
     bill_blocks = re.findall(
         r'<a[^>]+href="([^"]*bills-introduced[^"]*\.pdf)"[^>]*>\s*(.*?)\s*</a>',
         html,
@@ -89,12 +75,12 @@ def fetch_parliament_bills(cutoff_hours: int = 168) -> list[dict]:
     )
     dates = re.findall(r'(\d{2}\.\d{2}\.\d{4})', html)
 
+    oldest_in_page = None
     for i, (pdf_path, raw_title) in enumerate(bill_blocks):
         title = _strip_html(raw_title).strip()
         if not title:
             continue
 
-        # Parse the introduction date (first date associated with this bill)
         introduced = None
         if i < len(dates):
             try:
@@ -102,8 +88,11 @@ def fetch_parliament_bills(cutoff_hours: int = 168) -> list[dict]:
             except ValueError:
                 pass
 
-        if introduced and introduced < cutoff:
-            continue
+        if introduced:
+            if oldest_in_page is None or introduced < oldest_in_page:
+                oldest_in_page = introduced
+            if introduced < cutoff:
+                continue
 
         link = pdf_path if pdf_path.startswith("http") else f"https://www.parliament.gov.sg{pdf_path}"
         items.append({
@@ -112,6 +101,39 @@ def fetch_parliament_bills(cutoff_hours: int = 168) -> list[dict]:
             "summary": f"Bill introduced in Singapore Parliament on {dates[i] if i < len(dates) else 'unknown date'}.",
             "source": "Parliament of Singapore",
         })
+
+    # If the oldest bill on this page is still within cutoff, there may be more
+    has_more = oldest_in_page is not None and oldest_in_page >= cutoff
+    return items, has_more
+
+
+def fetch_parliament_bills(cutoff_hours: int = 168) -> list[dict]:
+    """Scrape recent bills from Singapore Parliament website."""
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=cutoff_hours)
+
+    items: list[dict] = []
+    # Check current year and previous year (for cutoff windows spanning Jan)
+    years = sorted({now.year, cutoff.year}, reverse=True)
+
+    for year in years:
+        page = 1
+        while page <= 5:  # Safety cap to avoid runaway requests
+            url = PARLIAMENT_BILLS_URL.format(year=year, page=page)
+            try:
+                response = httpx.get(url, timeout=15, follow_redirects=True)
+                html = response.text
+            except Exception:
+                break
+
+            page_items, has_more = _parse_bills_page(html, cutoff)
+            items.extend(page_items)
+
+            if not page_items and not has_more:
+                break
+            if not has_more:
+                break
+            page += 1
 
     return items
 
