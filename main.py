@@ -1,6 +1,7 @@
 import logging
 import os
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -29,7 +30,7 @@ def main() -> None:
     scheduler = AsyncIOScheduler()
 
     async def tick() -> None:
-        now = datetime.now().strftime("%H:%M")
+        now = datetime.now(ZoneInfo(TIMEZONE)).strftime("%H:%M")
         await send_scheduled_digests(now, app.bot)
 
     trigger = CronTrigger(minute="*", timezone=TIMEZONE)

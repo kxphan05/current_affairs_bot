@@ -152,16 +152,35 @@ async def cmd_now(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 # ── Digest delivery ───────────────────────────────────────────────
 
 
+async def _send_message_safe(bot: Bot, chat_id: int, text: str) -> None:
+    """Send a message with Markdown, falling back to plain text on parse errors."""
+    try:
+        await bot.send_message(
+            chat_id=chat_id, text=text,
+            parse_mode=ParseMode.MARKDOWN,
+            disable_web_page_preview=True,
+        )
+    except Exception as e:
+        if "parse entities" in str(e).lower() or "can't find end" in str(e).lower():
+            logger.warning(f"Markdown parse failed for {chat_id}, sending as plain text")
+            await bot.send_message(
+                chat_id=chat_id, text=text,
+                disable_web_page_preview=True,
+            )
+        else:
+            raise
+
+
 async def _send_digest_to(bot: Bot, chat_id: int, categories: list[str]) -> None:
     """Build and send digest to a single chat."""
     all_news = fetch_all_news()
     digest = build_digest(all_news, category_keys=categories)
 
     if len(digest) <= 4096:
-        await bot.send_message(chat_id=chat_id, text=digest, parse_mode=ParseMode.MARKDOWN)
+        await _send_message_safe(bot, chat_id, digest)
     else:
         for chunk in digest.split("\n\n---\n\n"):
-            await bot.send_message(chat_id=chat_id, text=chunk, parse_mode=ParseMode.MARKDOWN)
+            await _send_message_safe(bot, chat_id, chunk)
 
 
 async def send_scheduled_digests(time_str: str, bot: Bot) -> None:
@@ -188,10 +207,10 @@ async def send_scheduled_digests(time_str: str, bot: Bot) -> None:
 
             digest = build_digest(all_news, category_keys=categories)
             if len(digest) <= 4096:
-                await bot.send_message(chat_id=chat_id, text=digest, parse_mode=ParseMode.MARKDOWN)
+                await _send_message_safe(bot, chat_id, digest)
             else:
                 for chunk in digest.split("\n\n---\n\n"):
-                    await bot.send_message(chat_id=chat_id, text=chunk, parse_mode=ParseMode.MARKDOWN)
+                    await _send_message_safe(bot, chat_id, chunk)
         except Exception as e:
             logger.error(f"Failed to send digest to {chat_id}: {e}")
 

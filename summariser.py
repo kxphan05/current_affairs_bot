@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 
 from openai import OpenAI
@@ -6,15 +7,26 @@ from config import CATEGORIES, PUBLICAI_API_KEY, PUBLICAI_BASE_URL, PUBLICAI_MOD
 
 
 SYSTEM_PROMPT = """\
-You are a TLDR news editor. Pick the 3-5 most important, distinct stories from the raw items. \
-Be extremely concise — each bullet must have a short headline and a single-sentence summary (max 15 words). \
-No fluff, no filler, no editorialising. Just the core fact.
+You are a TLDR news editor. Group ALL the raw items by common theme, then summarise each item under its theme.
 
-CRITICAL: Every bullet MUST end with a markdown link using the exact URL from the raw item's Link field. \
-Never omit the link. Never fabricate a URL.
+Rules:
+- Identify 2-4 natural themes from the stories (e.g. "Middle East tensions", "Trade & tariffs", "AI regulation").
+- Theme headers: use a short bold label, max 4 words.
+- Under each theme, list every relevant story as a bullet.
+- Headline: max 6 words. DO NOT copy the article title. Write your own punchy short headline.
+- Summary: one sentence, max 12 words. Add context the headline doesn't already give.
+- Every bullet MUST end with a markdown link from the raw item's Link field. Never fabricate URLs.
+- If a story doesn't fit any theme, group it under "Other".
+- No fluff, no filler, no editorialising. Just the core fact.
 
-Output ONLY the bullet points, no preamble. Format each bullet exactly like this example:
-• **US exits Paris accord** — Trump signs executive order withdrawing from climate agreement. [Link](https://example.com)
+Output ONLY the grouped bullets, no preamble. Follow this format EXACTLY:
+
+**Trade & tariffs**
+• **EU hits back** — Retaliatory tariffs on US goods take effect Monday. [Link](https://example.com)
+• **China export curbs** — Beijing restricts rare earth exports to US firms. [Link](https://example.com)
+
+**Middle East tensions**
+• **Iran talks stall** — Nuclear negotiations collapse after new sanctions. [Link](https://example.com)
 """
 
 CATEGORY_INSTRUCTIONS = {
@@ -40,6 +52,32 @@ client = OpenAI(
 )
 
 
+def _sanitize_telegram_markdown(text: str) -> str:
+    """Fix common Telegram Markdown issues from LLM output."""
+    # Fix unclosed bold markers: ensure ** come in pairs
+    parts = text.split("**")
+    if len(parts) % 2 == 0:  # Odd number of ** means one is unclosed
+        text = "**".join(parts[:-1]) + parts[-1]
+
+    # Fix unclosed italic markers (standalone _ not inside links/words)
+    # Count _ that are not part of URLs or __
+    segments = re.split(r'(\[.*?\]\(.*?\))', text)  # Preserve markdown links
+    for i, seg in enumerate(segments):
+        if seg.startswith('[') and '](' in seg:
+            continue  # Skip link segments
+        underscores = [m.start() for m in re.finditer(r'(?<!\w)_(?!\w)|(?<=\w)_(?!\w)|(?<!\w)_(?=\w)', seg)]
+        if len(underscores) % 2 != 0:
+            # Remove the last unpaired underscore
+            seg = seg[:underscores[-1]] + seg[underscores[-1] + 1:]
+            segments[i] = seg
+    text = "".join(segments)
+
+    # Fix malformed links: [text](url  missing closing paren
+    text = re.sub(r'\[([^\]]*)\]\(([^)]*?)(?:\s*$|\s*\n)', r'[\1](\2)\n', text)
+
+    return text
+
+
 def summarise_category(category_key: str, items: list[dict]) -> str:
     """Use PublicAI to summarise raw news items into a clean digest section."""
     if not items:
@@ -61,7 +99,7 @@ def summarise_category(category_key: str, items: list[dict]) -> str:
                 {"role": "user", "content": prompt},
             ],
         )
-        return response.choices[0].message.content.strip()
+        return _sanitize_telegram_markdown(response.choices[0].message.content.strip())
     except Exception as e:
         if "contentfilter" in str(e).lower() or "content_policy" in str(e).lower():
             return "_Summary unavailable — content was filtered by the API provider._"
