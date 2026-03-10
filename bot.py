@@ -173,7 +173,7 @@ async def _send_message_safe(bot: Bot, chat_id: int, text: str) -> None:
 
 async def _send_digest_to(bot: Bot, chat_id: int, categories: list[str]) -> None:
     """Build and send digest to a single chat."""
-    all_news = fetch_all_news()
+    all_news = fetch_all_news(categories=categories)
     digest = build_digest(all_news, category_keys=categories)
 
     if len(digest) <= 4096:
@@ -191,7 +191,9 @@ async def send_scheduled_digests(time_str: str, bot: Bot) -> None:
 
     logger.info(f"Sending digest for {time_str} to {len(subscribers)} subscriber(s)")
 
-    all_news = fetch_all_news()
+    # Fetch only the union of categories needed across all subscribers
+    needed = list({cat for _, cats in subscribers for cat in cats})
+    all_news = fetch_all_news(categories=needed)
 
     for chat_id, categories in subscribers:
         try:

@@ -145,11 +145,13 @@ CATEGORY_CUTOFF_HOURS: dict[str, int] = {
 DEFAULT_CUTOFF_HOURS = 72  # 3 days
 
 
-def fetch_all_news() -> dict[str, list[dict]]:
-    """Fetch news from all RSS feeds, grouped by category."""
+def fetch_all_news(categories: list[str] | None = None) -> dict[str, list[dict]]:
+    """Fetch news from RSS feeds, optionally filtered to specific categories."""
     all_news: dict[str, list[dict]] = {}
 
     for category, feeds in RSS_FEEDS.items():
+        if categories and category not in categories:
+            continue
         cutoff = CATEGORY_CUTOFF_HOURS.get(category, DEFAULT_CUTOFF_HOURS)
         items: list[dict] = []
         for feed_url in feeds:
