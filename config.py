@@ -7,7 +7,7 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TIMEZONE = os.getenv("TIMEZONE", "Asia/Singapore")
 PUBLICAI_API_KEY = os.getenv("PUBLICAI_API_KEY", "")
 PUBLICAI_BASE_URL = os.getenv("PUBLICAI_BASE_URL", "https://api.publicai.co/v1")
-PUBLICAI_MODEL = os.getenv("PUBLICAI_MODEL", "molmo")
+PUBLICAI_MODEL = os.getenv("PUBLICAI_MODEL", "utter-project/EuroLLM-22B-Instruct-2512")
 
 RSS_FEEDS = {
     "ai_general": [
