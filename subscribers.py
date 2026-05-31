@@ -67,6 +67,24 @@ def set_time(chat_id: int, time: str) -> bool:
     return True
 
 
+def set_research_interests(chat_id: int, interests: str) -> bool:
+    """Save free-text research interests. Returns False if not subscribed."""
+    data = _load()
+    key = str(chat_id)
+    if key not in data:
+        return False
+    data[key]["research_interests"] = interests.strip()
+    _save(data)
+    return True
+
+
+def get_research_interests(chat_id: int) -> str:
+    """Return saved interests, or '' if none / not subscribed."""
+    data = _load()
+    sub = data.get(str(chat_id))
+    return sub.get("research_interests", "") if sub else ""
+
+
 def toggle_category(chat_id: int, category: str) -> bool | None:
     """Toggle a category on/off. Returns new state, or None if not subscribed."""
     data = _load()
