@@ -3,7 +3,7 @@ from datetime import datetime
 
 from openai import OpenAI
 
-from config import CATEGORIES, PUBLICAI_API_KEY, PUBLICAI_BASE_URL, PUBLICAI_MODEL
+from config import CATEGORIES, LLM_API_KEY, LLM_BASE_URL, LLM_MODEL
 
 
 SYSTEM_PROMPT = """\
@@ -53,8 +53,8 @@ CATEGORY_INSTRUCTIONS = {
 }
 
 client = OpenAI(
-    api_key=PUBLICAI_API_KEY,
-    base_url=PUBLICAI_BASE_URL,
+    api_key=LLM_API_KEY,
+    base_url=LLM_BASE_URL,
     default_headers={"User-Agent": "affairsbot/1.0"},
 )
 
@@ -117,7 +117,7 @@ def _trim_themes(text: str) -> str:
 
 
 def summarise_category(category_key: str, items: list[dict]) -> str:
-    """Use PublicAI to summarise raw news items into a clean digest section."""
+    """Use the configured LLM to summarise raw news items into a clean digest section."""
     if not items:
         return "_No recent items found._"
 
@@ -131,7 +131,7 @@ def summarise_category(category_key: str, items: list[dict]) -> str:
 
     try:
         response = client.chat.completions.create(
-            model=PUBLICAI_MODEL,
+            model=LLM_MODEL,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": prompt},
