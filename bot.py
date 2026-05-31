@@ -15,10 +15,12 @@ from telegram.ext import (
 from config import CATEGORIES, TELEGRAM_BOT_TOKEN
 from news import fetch_all_news
 from subscribers import (
+    get_research_interests,
     get_subscriber,
     get_subscribers_for_time,
     has_set_categories,
     mark_categories_prompted,
+    set_research_interests,
     set_time,
     subscribe,
     toggle_category,
@@ -41,6 +43,7 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         "/settime — Change delivery time, e.g. /settime1830\n"
         "/categories — Choose which news categories you want\n"
         "/unsubscribe — Stop receiving digests\n"
+        "/research — Tailor the AI for Developers section to your interests\n"
         "/status — Check your subscription\n"
         "/now — Get a digest right now"
     )
@@ -97,6 +100,35 @@ async def cmd_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         )
     else:
         await update.message.reply_text("You're not subscribed. Use /subscribe to start.")
+
+
+async def cmd_research(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    chat_id = update.effective_chat.id
+    raw = update.message.text.split(maxsplit=1)
+    topics = raw[1].strip() if len(raw) > 1 else ""
+
+    if not topics:
+        current = get_research_interests(chat_id)
+        if current:
+            await update.message.reply_text(
+                f"Your research interests:\n{current}\n\n"
+                "Send /research <topics> to update them."
+            )
+        else:
+            await update.message.reply_text(
+                "Set your AI-research interests to tailor the "
+                "👨‍💻 AI for Developers section.\n"
+                "Example: /research RAG, diffusion models, agentic workflows"
+            )
+        return
+
+    if set_research_interests(chat_id, topics):
+        await update.message.reply_text(
+            f"Saved! Your AI for Developers digest will focus on:\n{topics}\n\n"
+            "Use /now to see it, or it'll apply to your next daily digest."
+        )
+    else:
+        await update.message.reply_text("You're not subscribed yet. Use /subscribe first.")
 
 
 # ── Category selection ────────────────────────────────────────────
@@ -174,7 +206,8 @@ async def _send_message_safe(bot: Bot, chat_id: int, text: str) -> None:
 async def _send_digest_to(bot: Bot, chat_id: int, categories: list[str]) -> None:
     """Build and send digest to a single chat."""
     all_news = fetch_all_news(categories=categories)
-    digest = build_digest(all_news, category_keys=categories)
+    interests = get_research_interests(chat_id)
+    digest = build_digest(all_news, category_keys=categories, research_interests=interests)
 
     if len(digest) <= 4096:
         await _send_message_safe(bot, chat_id, digest)
@@ -207,7 +240,8 @@ async def send_scheduled_digests(time_str: str, bot: Bot) -> None:
                 )
                 mark_categories_prompted(chat_id)
 
-            digest = build_digest(all_news, category_keys=categories)
+            interests = get_research_interests(chat_id)
+            digest = build_digest(all_news, category_keys=categories, research_interests=interests)
             if len(digest) <= 4096:
                 await _send_message_safe(bot, chat_id, digest)
             else:
@@ -230,6 +264,7 @@ def build_app() -> Application:
     app.add_handler(MessageHandler(filters.Regex(r"^/settime"), cmd_settime))
     app.add_handler(CommandHandler("categories", cmd_categories))
     app.add_handler(CommandHandler("status", cmd_status))
+    app.add_handler(CommandHandler("research", cmd_research))
     app.add_handler(CommandHandler("now", cmd_now))
     app.add_handler(CallbackQueryHandler(handle_category_toggle, pattern=r"^cat:"))
     return app
