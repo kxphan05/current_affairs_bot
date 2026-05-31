@@ -116,7 +116,7 @@ def _trim_themes(text: str) -> str:
     return "\n".join(result).strip()
 
 
-def summarise_category(category_key: str, items: list[dict]) -> str:
+def summarise_category(category_key: str, items: list[dict], research_interests: str = "") -> str:
     """Use the configured LLM to summarise raw news items into a clean digest section."""
     if not items:
         return "_No recent items found._"
@@ -127,6 +127,13 @@ def summarise_category(category_key: str, items: list[dict]) -> str:
     )
 
     extra = CATEGORY_INSTRUCTIONS.get(category_key, "")
+    if research_interests:
+        extra += (
+            f"\n\nThe reader is a developer/researcher specifically interested in: "
+            f"{research_interests}. Prioritise items matching these interests and "
+            f"lead with them. Down-rank or skip items unrelated to these interests. "
+            f"If nothing matches, say '_No items matching your interests today._'"
+        )
     prompt = f"Category: {CATEGORIES[category_key]}\n{extra}\n\nRaw items:\n{raw_text}"
 
     try:
@@ -145,7 +152,11 @@ def summarise_category(category_key: str, items: list[dict]) -> str:
         return f"_Summarisation failed: {e}_"
 
 
-def build_digest(all_news: dict[str, list[dict]], category_keys: list[str] | None = None) -> str:
+def build_digest(
+    all_news: dict[str, list[dict]],
+    category_keys: list[str] | None = None,
+    research_interests: str = "",
+) -> str:
     """Build the full formatted digest message, optionally filtered to specific categories."""
     sections: list[str] = []
     keys = category_keys or list(CATEGORIES.keys())
@@ -155,7 +166,10 @@ def build_digest(all_news: dict[str, list[dict]], category_keys: list[str] | Non
             continue
         label = CATEGORIES[category_key]
         items = all_news.get(category_key, [])
-        summary = summarise_category(category_key, items)
+        if category_key == "ai_dev":
+            summary = summarise_category(category_key, items, research_interests)
+        else:
+            summary = summarise_category(category_key, items)
         sections.append(f"{label}\n\n{summary}")
 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M %Z")
