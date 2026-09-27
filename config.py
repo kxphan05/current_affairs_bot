@@ -11,18 +11,6 @@ LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://openrouter.ai/api/v1")
 LLM_MODEL = os.getenv("LLM_MODEL", "openrouter/free")
 
 RSS_FEEDS = {
-    "ai_general": [
-        "https://techcrunch.com/category/artificial-intelligence/feed/",
-        "https://www.technologyreview.com/feed/",
-        "https://feeds.arstechnica.com/arstechnica/technology-lab",
-        "https://the-decoder.com/feed/",
-    ],
-    "ai_dev": [
-        "http://export.arxiv.org/rss/cs.AI",
-        "http://export.arxiv.org/rss/cs.LG",
-        "https://huggingface.co/blog/feed.xml",
-        "https://simonwillison.net/atom/everything/",
-    ],
     "geopolitics": [
         "https://feeds.bbci.co.uk/news/world/rss.xml",
         "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
@@ -50,22 +38,13 @@ RSS_FEEDS = {
         "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6511",
         "https://www.straitstimes.com/news/singapore/rss.xml",
     ],
-    "ai_conflicts": [
-        "https://feeds.bbci.co.uk/news/technology/rss.xml",
-        "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
-        "https://feeds.bbci.co.uk/news/world/rss.xml",
-        "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
-        "https://www.aljazeera.com/xml/rss/all.xml",
-    ],
 }
 
 CATEGORIES = {
-    "ai_general": "🤖 General AI Developments",
-    "ai_dev": "👨‍💻 AI for Developers & Researchers",
     "geopolitics": "🌍 Geopolitics",
     "science": "🔬 Science",
     "tech": "💻 Tech",
     "business": "💰 Business & Economy",
     "sg_policy": "🇸🇬 Singapore Public Policy",
-    "ai_conflicts": "⚔️ AI in Current Affairs & Conflicts",
+    "hackathon_sg": "🚀 Hackathons (Singapore)",
 }

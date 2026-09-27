@@ -13,15 +13,24 @@ ALL_CATEGORIES = list(CATEGORIES.keys())
 # Categories that replaced the old "current_affairs" umbrella
 _CURRENT_AFFAIRS_REPLACEMENTS = ["geopolitics", "science", "tech", "business"]
 
+# Legacy AI categories dropped in favour of "hackathon_sg"
+_RETIRED_AI_CATEGORIES = ["ai_general", "ai_dev", "ai_conflicts"]
+
 
 def _migrate_categories(cats: list[str]) -> list[str]:
-    """Replace legacy 'current_affairs' with the 4 new sub-categories."""
-    if "current_affairs" not in cats:
-        return cats
-    cats = [c for c in cats if c != "current_affairs"]
-    for new in _CURRENT_AFFAIRS_REPLACEMENTS:
-        if new not in cats:
-            cats.append(new)
+    """Replace legacy 'current_affairs' with the 4 new sub-categories, and drop
+    the retired AI categories in favour of 'hackathon_sg'."""
+    if "current_affairs" in cats:
+        cats = [c for c in cats if c != "current_affairs"]
+        for new in _CURRENT_AFFAIRS_REPLACEMENTS:
+            if new not in cats:
+                cats.append(new)
+
+    if any(c in cats for c in _RETIRED_AI_CATEGORIES):
+        cats = [c for c in cats if c not in _RETIRED_AI_CATEGORIES]
+        if "hackathon_sg" not in cats:
+            cats.append("hackathon_sg")
+
     return cats
 
 
@@ -65,24 +74,6 @@ def set_time(chat_id: int, time: str) -> bool:
     data[key]["time"] = time
     _save(data)
     return True
-
-
-def set_research_interests(chat_id: int, interests: str) -> bool:
-    """Save free-text research interests. Returns False if not subscribed."""
-    data = _load()
-    key = str(chat_id)
-    if key not in data:
-        return False
-    data[key]["research_interests"] = interests.strip()
-    _save(data)
-    return True
-
-
-def get_research_interests(chat_id: int) -> str:
-    """Return saved interests, or '' if none / not subscribed."""
-    data = _load()
-    sub = data.get(str(chat_id))
-    return sub.get("research_interests", "") if sub else ""
 
 
 def toggle_category(chat_id: int, category: str) -> bool | None:

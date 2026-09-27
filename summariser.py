@@ -44,12 +44,6 @@ CATEGORY_INSTRUCTIONS = {
         "Be generous — if it affects Singaporeans, include it. "
         "Only skip pure entertainment, celebrity gossip, and sports results."
     ),
-    "ai_conflicts": (
-        "IMPORTANT: Only pick stories where AI/technology directly intersects with "
-        "geopolitics, warfare, conflicts, or international disputes. "
-        "Ignore stories that are purely about AI or purely about conflicts. "
-        "If no stories match this intersection, say '_No relevant stories today._'"
-    ),
 }
 
 client = OpenAI(
@@ -116,7 +110,7 @@ def _trim_themes(text: str) -> str:
     return "\n".join(result).strip()
 
 
-def summarise_category(category_key: str, items: list[dict], research_interests: str = "") -> str:
+def summarise_category(category_key: str, items: list[dict]) -> str:
     """Use the configured LLM to summarise raw news items into a clean digest section."""
     if not items:
         return "_No recent items found._"
@@ -127,13 +121,6 @@ def summarise_category(category_key: str, items: list[dict], research_interests:
     )
 
     extra = CATEGORY_INSTRUCTIONS.get(category_key, "")
-    if research_interests:
-        extra += (
-            f"\n\nThe reader is a developer/researcher specifically interested in: "
-            f"{research_interests}. Prioritise items matching these interests and "
-            f"lead with them. Down-rank or skip items unrelated to these interests. "
-            f"If nothing matches, say '_No items matching your interests today._'"
-        )
     prompt = f"Category: {CATEGORIES[category_key]}\n{extra}\n\nRaw items:\n{raw_text}"
 
     try:
@@ -152,10 +139,37 @@ def summarise_category(category_key: str, items: list[dict], research_interests:
         return f"_Summarisation failed: {e}_"
 
 
+def summarise_hackathons_sg() -> str:
+    """Use the LLM's live web-search capability to find Singapore hackathons."""
+    prompt = (
+        "Search the web for hackathons, coding competitions, and dev challenges "
+        "happening in or targeted at Singapore in the next 4-6 weeks, or currently "
+        "open for registration. For each one include: event name, date(s), "
+        "venue/format (in-person/online/hybrid), and a registration or info link. "
+        "Only include events physically in Singapore or explicitly for the "
+        "Singapore tech community. If you find none, say "
+        "'_No upcoming Singapore hackathons found._'"
+    )
+    try:
+        response = client.chat.completions.create(
+            model=LLM_MODEL,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            extra_body={"plugins": [{"id": "web"}]},
+        )
+        content = response.choices[0].message.content.strip()
+        return _sanitize_telegram_markdown(_trim_themes(content))
+    except Exception as e:
+        if "contentfilter" in str(e).lower() or "content_policy" in str(e).lower():
+            return "_Summary unavailable — content was filtered by the API provider._"
+        return f"_Summarisation failed: {e}_"
+
+
 def build_digest(
     all_news: dict[str, list[dict]],
     category_keys: list[str] | None = None,
-    research_interests: str = "",
 ) -> str:
     """Build the full formatted digest message, optionally filtered to specific categories."""
     sections: list[str] = []
@@ -165,10 +179,10 @@ def build_digest(
         if category_key not in CATEGORIES:
             continue
         label = CATEGORIES[category_key]
-        items = all_news.get(category_key, [])
-        if category_key == "ai_dev":
-            summary = summarise_category(category_key, items, research_interests)
+        if category_key == "hackathon_sg":
+            summary = summarise_hackathons_sg()
         else:
+            items = all_news.get(category_key, [])
             summary = summarise_category(category_key, items)
         sections.append(f"{label}\n\n{summary}")
 

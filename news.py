@@ -140,7 +140,6 @@ def fetch_parliament_bills(cutoff_hours: int = 168) -> list[dict]:
 
 CATEGORY_CUTOFF_HOURS: dict[str, int] = {
     "sg_policy": 168,  # 7 days
-    "ai_conflicts": 168,  # 7 days
 }
 DEFAULT_CUTOFF_HOURS = 72  # 3 days
 
