@@ -141,14 +141,20 @@ def summarise_category(category_key: str, items: list[dict]) -> str:
 
 def summarise_hackathons_sg() -> str:
     """Use the LLM's live web-search capability to find Singapore hackathons."""
+    today = datetime.now().strftime("%A, %d %B %Y")
     prompt = (
-        "Search the web for hackathons, coding competitions, and dev challenges "
-        "happening in or targeted at Singapore in the next 4-6 weeks, or currently "
-        "open for registration. For each one include: event name, date(s), "
+        f"Today's date is {today}. Search the web for hackathons, coding "
+        "competitions, and dev challenges happening in or targeted at Singapore "
+        "in the next 4-6 weeks, or currently open for registration. "
+        "For each one include: event name, date(s), "
         "venue/format (in-person/online/hybrid), and a registration or info link. "
         "Only include events physically in Singapore or explicitly for the "
-        "Singapore tech community. If you find none, say "
-        "'_No upcoming Singapore hackathons found._'"
+        "Singapore tech community. "
+        f"STRICT: the event must start on or after {today}, or have registration "
+        "still open. Exclude anything that has already ended, and anything whose "
+        "date or year you cannot confirm from the page itself — do not guess "
+        "dates from older editions of recurring events. "
+        "If you find none, say '_No upcoming Singapore hackathons found._'"
     )
     try:
         response = client.chat.completions.create(
